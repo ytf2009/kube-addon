@@ -1,0 +1,16 @@
+version: 4.3.0
+appVersion: 3.4.13
+name: zookeeper
+description:  分布式协调服务 .
+home: http://www.qloudpaas.com
+icon: http://mart.csftgroup.com:30024/images/icon/qloudmonitor.jpg
+keywords:
+- paas
+- qloudpaas-zookeeper
+maintainers:
+- email: sre@gcstgroup.com
+  name: sre
+sources:
+- http://www.qloudpaas.com
+engine: gotpl
+

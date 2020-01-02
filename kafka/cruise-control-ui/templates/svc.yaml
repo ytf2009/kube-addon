@@ -1,0 +1,34 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.annotations.name }}
+  labels:
+    app: {{ template "common.name" . }}
+    chart: {{ template "common.chart.name" . }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    {{- if .Values.service.annotations }}
+    {{ toYaml .Values.service.annotations | indent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  {{- range $i,$map :=  .Values.service.ports }}
+  - port: {{ $map.port }}
+    name: {{ $.Values.service.annotations.name }}-{{ $i }}
+    {{- if $map.nodePort }}
+    nodePort: {{ $map.nodePort }}
+    {{- end }}
+    {{- if $map.targetPort }}
+    targetPort: {{ $map.targetPort }}
+    {{- end }}
+    {{- if $map.protocol }}
+    protocol: {{ $map.protocol }}
+    {{- end }}
+  {{- end }}
+  selector:
+    app: {{ template "common.name" . }}
+    release: "{{ .Release.Name }}"
+{{- end }}

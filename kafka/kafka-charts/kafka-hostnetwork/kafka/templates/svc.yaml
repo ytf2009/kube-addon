@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.annotations.name }}
+  labels:
+    app: {{ template "common.name" . }}
+    chart: {{ template "common.chart.name" . }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    {{- if .Values.service.annotations }}
+    {{ toYaml .Values.service.annotations | indent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.service.headless }}
+  clusterIP: None
+  type: {{ $.Values.service.type }}
+  {{- else }}
+  type: {{ $.Values.service.type }}
+  {{- end }}
+  ports:
+  {{- range $i,$map :=  .Values.service.ports }}
+  - port: {{ $map.port }}
+    name: {{ $.Values.service.annotations.name }}-{{ $i }}
+  {{- end }}
+  selector:
+    app: {{ template "common.name" . }}
+    release: "{{ .Release.Name }}"

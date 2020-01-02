@@ -1,0 +1,133 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: {{ template "common.fullname" . }}
+  labels:
+    app: {{ template "common.name" . }}
+    chart: {{ template "common.chart.name" . }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  replicas: {{ .Values.statefulset.replicas }} 
+  serviceName: {{ .Values.service.annotations.name }}
+  template:
+    metadata:
+      labels:
+        {{- if .Values.persistence.labels }}
+{{ toYaml .Values.persistence.labels | indent 8 }}
+        {{- end }}
+        app: {{ template "common.name" . }}
+        release: "{{ .Release.Name }}"
+    spec:
+      {{- if .Values.hostAliases.enabled }}
+      {{- range $i,$map :=  .Values.hostAliases.list }}
+      hostAliases:
+      - ip: {{ $map.ip }}
+        hostnames: 
+        {{- range  $map.hostnames }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.initContainers.enabled }}
+      initContainers:
+      - name: "wait-service-run"
+        image: "{{ .Values.global.image.repository_name }}/{{ .Values.initContainers.image }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        command: ["sh", "-c", "{{ .Values.initContainers.command }}"]
+      {{- end }}
+      containers:
+      - name: {{ template "common.containers.name" . }}
+        image: "{{ .Values.global.image.repository_name }}/{{ .Values.image.repository }}:{{.Chart.AppVersion}}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        command: 
+        - sh
+        - -c
+        - "rm -rf /tmp/kafka-logs/lost+found ;exec /usr/local/kafka_2.12-2.3.1/bin/kafka-server-start.sh /usr/local/kafka_2.12-2.3.1/config/server.properties \
+          --override broker.id=${HOSTNAME##*-} \
+          --override listeners=PLAINTEXT://0.0.0.0:{{ .Values.kafkaConfig.port }} \
+          --override advertised.listeners=PLAINTEXT://${POD_IP}:{{ .Values.kafkaConfig.port }} \
+          --override zookeeper.connect={{ .Values.kafkaConfig.zks }} \
+          --override log.dirs=/tmp/kafka-logs \
+          --override auto.leader.rebalance.enable=true \
+          --override metric.reporters=com.linkedin.kafka.cruisecontrol.metricsreporter.CruiseControlMetricsReporter \
+          --override num.partitions=3 "
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        {{- range $i,$map :=  .Values.env }}     
+        - name: "{{ $map.name }}"
+          value: "{{ $map.value }}"
+        {{- end }}
+        {{- if .Values.envsecret.enabled }}
+        {{- range $i,$map :=  .Values.envsecret.data }}
+        - name: "{{ $map.envname }}"
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.service.annotations.name }}-envsecret
+              key: "{{ $map.key }}"
+        {{- end }}
+        {{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        ports:         
+        {{- range $i,$map :=  .Values.statefulset.ports }}
+        - name: containerport-{{ $i }}
+          {{- if $map.protocol }}
+          protocol: "{{ $map.protocol }}"
+          {{- else }}
+          protocol: "TCP"
+          {{- end }}
+          containerPort: {{ $map.containerPort }}
+        {{- end }}
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "{{ .Values.livenessProbe.command }}"]
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "{{ .Values.readinessProbe.command }}"]
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        {{- range $i,$map :=  .Values.volumeMounts }}
+        - name: {{ $map.name }}
+          mountPath: {{ $map.mountPath | quote }}
+        {{- end }}
+        {{- end }}
+  {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+  volumeClaimTemplates:
+  {{- range $zkIndex,$map :=  .Values.volumeMounts }}
+  - metadata:
+      labels:
+        app: {{ template "common.name" $ }}
+        release: "{{ $.Release.Name }}"
+        {{- if $.Values.persistence.labels }}
+{{ toYaml $.Values.persistence.labels | indent 8 }}
+        {{- end }}
+      name: {{ $map.name }}
+      annotations:
+      {{- if $.Values.persistence.annotations }}
+{{ toYaml $.Values.persistence.annotations | indent 8 }}
+      {{- end }}
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: {{ $.Values.persistence.size }}     
+  {{- end }}  
+  {{- end }} 

@@ -1,0 +1,23 @@
+{{- if .Values.configMapEnabled }}
+{{- range $i,$map :=  .Values.configMapList }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Values.serviceName }}-{{ $map.name }}
+  labels:
+    app: {{ template "common.name" $ }}
+    svc: 
+    chart: {{ template "common.chart.name" $ }}
+    release: "{{ $.Release.Name }}"
+    heritage: "{{ $.Release.Service }}"
+data:
+{{- range $j,$item :=  $map.items }}
+  {{ $item.key }}: |-
+{{- if $item.fileName }}
+{{ $.Files.Get $item.fileName | indent 4 }}
+{{- end -}}
+
+{{- end -}}
+{{- end -}}
+{{- end -}}

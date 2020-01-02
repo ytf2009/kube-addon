@@ -1,0 +1,28 @@
+{{- if and .Values.persistenceEnabled (not .Values.persistenceExistingClaim) }}
+{{- range $zkIndex,$map :=  .Values.volume }}
+{{- if eq  "gluster" ($map.type) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ $.Values.serviceName }}-{{ $map.name }}
+{{- if $.Values.persistenceAnnotations }}
+  annotations:
+{{ toYaml $.Values.persistenceAnnotations | indent 4 }}
+{{- end }}
+{{- if $.Values.persistenceLabels }}
+  labels:
+{{ toYaml $.Values.persistenceLabels | indent 4 }}
+{{- end }}
+spec:
+  accessModes:
+    - {{ $map.accessModes }}
+  resources:
+    requests:
+      storage: {{ $map.volumeSize }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
+
+      
+ 

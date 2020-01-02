@@ -1,0 +1,14 @@
+name: qloudpvc-minio
+version: 4.3.0
+appVersion: 4.3.0
+keywords:
+- qloud-pvc-es
+description: Minio PVC .
+home: http://www.qloudpaas.com
+icon: http://mart.csftgroup.com:30024/images/icon/qloudmonitor.jpg
+maintainers:
+- email: sre@gcstgroup.com
+  name: sre
+sources:
+- http://www.qloudpaas.com
+engine: gotpl

@@ -1,0 +1,149 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "common.fullname" . }}
+  labels:
+    app: {{ template "common.name" . }}
+    chart: {{ template "common.chart.name" . }}
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+spec:
+  selector:
+    matchLabels:
+      app: {{ template "common.name" . }}
+  replicas: {{ .Values.deployment.replicas }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "common.name" . }}
+        release: "{{ .Release.Name }}"
+    spec:
+      {{- if .Values.hostAliases.enabled }}
+      hostAliases:
+      {{- range $i,$map :=  .Values.hostAliases.list }}
+      - ip: {{ $map.ip }}
+        hostnames: 
+        {{- range  $map.hostnames }}
+        - "{{ . }}"
+        {{- end }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.initContainers.enabled }}
+      initContainers:
+      - name: "wait-service-run"
+        image: "{{ .Values.global.image.repository_name }}/{{ .Values.initContainers.image }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        command: ["sh", "-c", "{{ .Values.initContainers.command }}"]
+      {{- end }}
+      {{- if .Values.initInstallContainers.enabled }}
+      initContainers:
+{{ include "init-install-shell" . | indent 6 }}
+      {{- end }}
+      containers:
+      - name: {{ template "common.containers.name" . }}
+        image: "{{ .Values.global.image.repository_name }}/{{ .Values.image.repository }}:{{.Chart.AppVersion}}"
+        imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+        {{- if .Values.containers.command }}
+        command: 
+        - sh
+        - -xc
+        - |
+{{ .Values.containers.command | indent 10 }}
+        {{- end }}
+        {{- if .Values.containers.args }}
+        args: {{ .Values.containers.args}}
+        {{- end }}
+        env:
+        {{- range $i,$map :=  .Values.env }}     
+        - name: "{{ $map.name }}"
+          value: "{{ $map.value }}"
+        {{- end }}
+        {{- if .Values.envsecret.enabled }}
+        {{- range $i,$map :=  .Values.envsecret.data }}
+        - name: "{{ $map.envname }}"
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Values.service.annotations.name }}-envsecret
+              key: "{{ $map.key }}"
+        {{- end }}
+        {{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}
+        ports:         
+        {{- range $i,$map :=  .Values.deployment.ports }}
+        - name: containerport-{{ $i }}
+          {{- if $map.protocol }}
+          protocol: "{{ $map.protocol }}"
+          {{- else }}
+          protocol: "TCP"
+          {{- end }}
+          containerPort: {{ $map.containerPort }}
+        {{- end }}
+         {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          exec:
+            command: ["sh", "-c", "{{ .Values.livenessProbe.command }}"]
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          exec:
+            command: ["sh", "-c", "{{ .Values.readinessProbe.command }}"]
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        {{- range $i,$map :=  .Values.volumeMounts }}
+
+        - name: {{ $map.name }}
+          mountPath: {{ $map.mountPath | quote }}
+          {{- if $map.subPath }}
+          subPath: {{ $map.subPath }}
+          {{- end }}
+
+        {{- end }}
+
+        {{- end }}
+      {{- if .Values.serviceAccountName }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- end }}  
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      {{- range $i,$map :=  .Values.volume }}
+
+       {{- if eq  "configMap" ($map.type) }}
+       - name: {{ $map.name }}
+         configMap:
+           name: {{ $.Values.service.annotations.name }}-{{ $map.name }}
+           {{- if $map.items }}
+           items:
+           {{- range $j,$item :=  $map.items }}
+           - key: {{ $item.key }}
+             path: {{ $item.path }}
+             mode: {{ $item.mode }}
+           {{- end }}
+           {{- end }}
+       {{- else if eq  "gluster" ($map.type) }}
+       - name: {{ $map.name }}
+         persistentVolumeClaim:
+           claimName: {{ $.Values.service.annotations.name }}-{{ $map.name }}
+       {{- else if eq  "secret" ($map.type) }}
+       - name: {{ $map.name }}
+         secret:
+           secretName: {{ $.Values.service.annotations.name }}-volumesecret
+       {{- end }}
+      {{- end }}
+
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
