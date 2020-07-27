@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: nginx2
+  namespace: paas
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - web.paas.k8s.com
+    secretName: paas-tls2
+  rules:
+  - host: web.paas.k8s.com
+    http:
+      paths:
+      - backend:
+          serviceName: mynginx
+          servicePort: 80

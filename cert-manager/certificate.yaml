@@ -8,8 +8,9 @@ spec:
   issuerRef:
     name: letsencrypt-prod
     kind: ClusterIssuer
-  duration: 2160h
+  duration: 8760h
   renewBefore: 360h
   # keyEncoding: pkcs1
   dnsNames:
   - web.k8s.com
+  - web.k9s.com
