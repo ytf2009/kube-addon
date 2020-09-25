@@ -33,11 +33,10 @@ spec:
         es: log
       containers:
       - name: kibana
-        image: kibana:7.8.0
+        image: kibana:6.8.10
         resources:
           limits:
             cpu: 1000m
-            memory: 4Gi
           requests:
             cpu: 1000m
         env:
